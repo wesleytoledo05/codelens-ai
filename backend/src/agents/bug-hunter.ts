@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
+import { mimoChat } from "../lib/mimo-client";
 
 // Types
 export type BugHunterInput = {
@@ -21,171 +21,227 @@ export type BugHunterOutput = {
   }>;
 };
 
-// Zod schema for output validation
-const BugSchema = z.object({
-  id: z.string().regex(/^BUG-\d{3}$/),
-  severity: z.enum(["HIGH", "MEDIUM", "LOW"]),
-  file: z.string(),
-  line: z.number(),
-  description: z.string(),
-  suggestion: z.string(),
-});
-
 const OutputSchema = z.object({
-  bugs: z.array(BugSchema),
+  bugs: z.array(z.object({
+    id: z.string(),
+    severity: z.enum(["HIGH", "MEDIUM", "LOW"]),
+    file: z.string(),
+    line: z.number(),
+    description: z.string(),
+    suggestion: z.string(),
+  })),
 });
 
-// System prompt for the Bug Hunter agent
-const SYSTEM_PROMPT = `You are a Bug Hunter agent specialized in analyzing code for potential bugs, antipatterns, and code smells.
+const SYSTEM_PROMPT = `Você é um agente Caça-Bugs. Analise código em busca de bugs, antipatterns e code smells.
 
-Your job is to analyze the provided code files and identify:
-1. Dead code (functions/variables declared but never used)
-2. Logically impossible conditions (e.g., if (x > 10 && x < 5))
-3. Possible null/undefined access without prior checks
-4. Loops with potential for infinite execution (missing or unreachable stop conditions)
-5. Potential memory leaks (listeners not removed, intervals not cleared)
-6. Known antipatterns: callback hell, magic numbers, direct state mutation in React
-7. Unhandled promises (missing .catch() or await without try/catch)
+Encontre: código morto, condições impossíveis, acesso a null/undefined, loops infinitos, vazamentos de memória, promises sem tratamento, antipatterns.
 
-For each bug found, provide:
-- A unique ID in format BUG-001, BUG-002, etc.
-- Severity: HIGH (critical bugs, crashes, security risks), MEDIUM (potential issues, antipatterns), LOW (minor issues, style)
-- The exact file path
-- The approximate line number
-- A clear description of the issue
-- A specific suggestion for fixing it
+Para cada bug forneça: id (BUG-001), severidade (HIGH/MEDIUM/LOW), arquivo, número da linha, descrição, sugestão.
 
-Prioritize HIGH and MEDIUM severity bugs. Only include LOW if there are few findings.
+IMPORTANTE: Retorne APENAS JSON válido. Sem markdown, sem explicação. As descrições e sugestões devem estar em português.`;
 
-IMPORTANT: You MUST respond with valid JSON only. No markdown, no explanation outside the JSON.`;
-
-// Custom error class for agent execution failures
 export class AgentExecutionError extends Error {
-  constructor(
-    message: string,
-    public readonly cause?: Error
-  ) {
+  constructor(message: string, public readonly cause?: Error) {
     super(message);
     this.name = "AgentExecutionError";
   }
 }
 
-// Main agent function
+// Robust JSON extraction from AI response
+function extractJSON(response: string): unknown {
+  // 1. Try to extract from markdown code blocks
+  const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (codeBlockMatch) {
+    try {
+      return JSON.parse(codeBlockMatch[1].trim());
+    } catch {}
+  }
+
+  // 2. Try to find first { to last } (handles text before/after JSON)
+  const firstBrace = response.indexOf("{");
+  const lastBrace = response.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    try {
+      return JSON.parse(response.substring(firstBrace, lastBrace + 1));
+    } catch {}
+  }
+
+  // 3. Try to find first [ to last ] (in case it returns an array)
+  const firstBracket = response.indexOf("[");
+  const lastBracket = response.lastIndexOf("]");
+  if (firstBracket !== -1 && lastBracket > firstBracket) {
+    try {
+      return JSON.parse(response.substring(firstBracket, lastBracket + 1));
+    } catch {}
+  }
+
+  throw new Error("No valid JSON found in response");
+}
+
 export async function runBugHunter(
   input: BugHunterInput
 ): Promise<BugHunterOutput> {
-  const anthropic = new Anthropic();
-
-  // Build the user message with all files
   const filesContent = input.files
-    .map(
-      (f) =>
-        `--- File: ${f.path} (${f.extension}) ---\n${f.content}\n--- End: ${f.path} ---`
-    )
+    .map((f) => `--- ${f.path} ---\n${f.content}`)
     .join("\n\n");
 
-  const userMessage = `Analyze the following code files for potential bugs, antipatterns, and code smells:
+  const userMessage = `Analise estes arquivos em busca de bugs e antipatterns.
 
 ${filesContent}
 
-Return your findings as a JSON object with this exact structure:
-{
-  "bugs": [
-    {
-      "id": "BUG-001",
-      "severity": "HIGH" | "MEDIUM" | "LOW",
-      "file": "path/to/file.ts",
-      "line": 42,
-      "description": "Description of the bug",
-      "suggestion": "How to fix it"
-    }
-  ]
-}
+Retorne JSON: {"bugs": [{"id": "BUG-001", "severity": "HIGH|MEDIUM|LOW", "file": "path", "line": 1, "description": "descrição em português", "suggestion": "sugestão em português"}]}
 
-If no bugs are found, return {"bugs": []}`;
+Se não houver bugs: {"bugs": []}
 
-  let response: string | undefined;
+Lembre-se: description e suggestion DEVEM estar em português brasileiro.`;
+
+  let response: string;
 
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userMessage }],
-    });
-
-    // Extract text from response
-    const block = message.content.find((b) => b.type === "text");
-    if (!block || block.type !== "text") {
-      throw new Error("No text block in Claude response");
-    }
-    response = block.text.trim();
+    response = await mimoChat(
+      [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userMessage },
+      ],
+      { maxTokens: 4096 }
+    );
   } catch (error) {
     throw new AgentExecutionError(
-      "Failed to call Claude API",
+      "Failed to call AI API",
       error instanceof Error ? error : undefined
     );
   }
 
-  // Parse and validate the response
+  // Try to parse JSON from response
   let parsed: unknown;
   try {
-    // Try to extract JSON if wrapped in markdown code blocks
-    const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)```/);
-    const jsonStr = jsonMatch ? jsonMatch[1] : response;
-    parsed = JSON.parse(jsonStr.trim());
-  } catch (parseError) {
-    // Retry once with explicit format request
+    parsed = extractJSON(response);
+  } catch {
+    // Retry with explicit format request
     try {
-      const retryMessage = await anthropic.messages.create({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
-        messages: [
+      const retryResponse = await mimoChat(
+        [
+          { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userMessage },
-          {
-            role: "assistant",
-            content: response,
-          },
+          { role: "assistant", content: response },
           {
             role: "user",
-            content:
-              "Your previous response was not valid JSON. Please respond with ONLY a valid JSON object matching the required structure. No markdown, no explanation, just the raw JSON.",
+            content: "Your response was not valid JSON. Respond with ONLY a valid JSON object. No markdown, no explanation.",
           },
         ],
-      });
-
-      const retryBlock = retryMessage.content.find((b) => b.type === "text");
-      if (!retryBlock || retryBlock.type !== "text") {
-        throw new Error("No text block in retry response");
-      }
-      const retryJsonMatch = retryBlock.text.match(
-        /```(?:json)?\s*([\s\S]*?)```/
+        { maxTokens: 4096 }
       );
-      const retryJsonStr = retryJsonMatch
-        ? retryJsonMatch[1]
-        : retryBlock.text.trim();
-      parsed = JSON.parse(retryJsonStr.trim());
+      parsed = extractJSON(retryResponse);
     } catch (retryError) {
       throw new AgentExecutionError(
-        "Failed to parse Claude response as JSON after retry",
-        retryError instanceof Error
-          ? retryError
-          : parseError instanceof Error
-            ? parseError
-            : undefined
+        "Failed to parse AI response as JSON after retry",
+        retryError instanceof Error ? retryError : undefined
       );
     }
   }
 
-  // Validate against Zod schema
+  // Validate with Zod, or coerce
+  const result = OutputSchema.safeParse(parsed);
+  if (result.success) {
+    const translated = result.data.bugs.map(bug => ({
+      ...bug,
+      description: translateToPortuguese(bug.description),
+      suggestion: translateToPortuguese(bug.suggestion),
+    }));
+    return { bugs: translated } as BugHunterOutput;
+  }
+
+  // Try coercion
+  const coerced = coerceBugHunterOutput(parsed);
+  if (coerced) return coerced;
+
+  throw new AgentExecutionError("AI response does not match expected schema");
+}
+
+function translateToPortuguese(text: string): string {
+  if (!text) return text;
+  const mappings: [RegExp, string][] = [
+    // Padrões gerais
+    [/is not set, which can cause ([^.]+)\./g, "não está definido(a), o que pode causar $1."],
+    [/is not set\b/g, "não está definido(a)"],
+    [/which can cause ([^.]+)\./g, "o que pode causar $1."],
+    [/database connection issues/g, "problemas de conexão com o banco de dados"],
+    [/Set a valid ([^.]+)\./g, "Defina um valor válido para $1."],
+    [/is set to ([^,]+), but the ([^.]+) are not set\./g, "está configurado como $1, mas $2 não estão definidos."],
+    [/is set to ([^,]+), but the ([^.]+) is not set\./g, "está configurado como $1, mas $2 não está definido(a)."],
+    [/Verify the ([^.]+)\./g, "Verifique $1."],
+    [/ensure they are correctly configured/g, "certifique-se de que estão corretamente configurados"],
+    [/is not checked for null or undefined before being used/g, "não é verificado como nulo ou indefinido antes de ser usado"],
+    [/should be checked to prevent null\/undefined access/g, "deve ser verificado para prevenir acesso a nulo/indefinido"],
+    [/Add a null check for the ([^.]+) before using it/g, "Adicione uma verificação de nulo para $1 antes de usá-lo"],
+    [/can be of type 'any'/g, "pode ser do tipo 'any'"],
+    [/should be of type '([^']+)'/g, "deve ser do tipo '$1'"],
+    [/to ensure type safety/g, "para garantir a segurança de tipos"],
+    [/Change the type of the ([^.]+) to '([^']+)'/g, "Altere o tipo de $1 para '$2'"],
+    [/to match the database type/g, "para corresponder ao tipo do banco de dados"],
+    [/No description/g, "Sem descrição"],
+    [/No suggestion/g, "Sem sugestão"],
+    // Padrões mais longos
+    [/The '([^']+)' parameter in the '([^']+)' and '([^']+)' methods can be of type 'any'\./g, "O parâmetro '$1' nos métodos '$2' e '$3' pode ser do tipo 'any'."],
+    [/It should be of type '([^']+) to ensure type safety\./g, "Deve ser do tipo '$1' para garantir a segurança de tipos."],
+    [/The '([^']+)' method does not check if the '([^']+)' parameter is null or undefined before using it\./g, "O método '$1' não verifica se o parâmetro '$2' é nulo ou indefinido antes de usá-lo."],
+    [/It should be checked to prevent null\/undefined access\./g, "Deve ser verificado para prevenir acesso a nulo/indefinido."],
+    [/The '([^']+)' property in the '([^']+)' type is of type '([^']+)', but it should be of type '([^']+)' to match the database type\./g, "A propriedade '$1' no tipo '$2' é do tipo '$3', mas deve ser do tipo '$4' para corresponder ao tipo do banco de dados."],
+    [/The '([^']+)' variable is not checked for null or undefined before being used\./g, "A variável '$1' não é verificada como nulo ou indefinida antes de ser usada."],
+    [/It should be checked to prevent null\/undefined access\./g, "Deve ser verificado para prevenir acesso a nulo/indefinido."],
+    [/Change the type of the ([^.]+) to '([^']+)'\./g, "Altere o tipo de $1 para '$2'."],
+    [/Verify the ([^.]+) and ensure they are correctly configured\./g, "Verifique $1 e certifique-se de que estão corretamente configurados."],
+    // Tradução de frases inteiras comuns
+    [/The '([^']+)' ([^ ]+) is not checked for null or undefined before being used\./g, "O $2 '$1' não é verificado como nulo ou indefinido antes de ser usado."],
+    [/The ([^ ]+) ([^ ]+) is not checked for null or undefined before being used\./g, "O $1 $2 não é verificado como nulo ou indefinido antes de ser usado."],
+    [/should be checked to prevent null\/undefined access\./g, "deve ser verificado para prevenir acesso a nulo/indefinido."],
+    [/Add a null check for the ([^.]+) before using it\./g, "Adicione uma verificação de nulo para $1 antes de usá-lo."],
+    // Padrões de "Change the type"
+    [/Change the type of the ([^ ]+) property to '([^']+)'\./g, "Altere o tipo da propriedade $1 para '$2'."],
+    [/Change the type of the ([^ ]+) parameter to '([^']+)'\./g, "Altere o tipo do parâmetro $1 para '$2'."],
+    // Padrões de "Verify"
+    [/Verify the ([^ ]+) settings and ensure they are correctly configured\./g, "Verifique as configurações de $1 e certifique-se de que estão corretamente configurados."],
+    // catch-all para frases que ainda estejam em inglês
+    [/The ([^ ]+) ([^ ]+) ([^ ]+) is not checked/g, "O $1 $2 $3 não é verificado"],
+    [/should be checked to prevent/g, "deve ser verificado para prevenir"],
+    [/before being used/g, "antes de ser usado"],
+    [/to prevent null\/undefined access/g, "para prevenir acesso a nulo/indefinido"],
+  ];
+  let result = text;
+  for (const [pattern, replacement] of mappings) {
+    result = result.replace(pattern, replacement);
+  }
+  return result;
+}
+
+function coerceBugHunterOutput(raw: unknown): BugHunterOutput | null {
   try {
-    const result = OutputSchema.parse(parsed);
-    return result as BugHunterOutput;
-  } catch (schemaError) {
-    throw new AgentExecutionError(
-      "Claude response does not match expected schema",
-      schemaError instanceof Error ? schemaError : undefined
-    );
+    const obj = raw as Record<string, unknown>;
+    const bugsArr = Array.isArray(obj.bugs) ? obj.bugs : [];
+    const validSeverities = ["HIGH", "MEDIUM", "LOW"];
+
+    const bugs = bugsArr
+      .filter((b: unknown) => {
+        const bb = b as Record<string, unknown>;
+        return bb && typeof bb.file === "string";
+      })
+      .map((b: unknown, i: number) => {
+        const bb = b as Record<string, unknown>;
+        const sev = typeof bb.severity === "string" && validSeverities.includes(bb.severity.toUpperCase())
+          ? bb.severity.toUpperCase() as "HIGH" | "MEDIUM" | "LOW"
+          : "MEDIUM";
+        return {
+          id: typeof bb.id === "string" ? bb.id : `BUG-${String(i + 1).padStart(3, "0")}`,
+          severity: sev,
+          file: bb.file as string,
+          line: typeof bb.line === "number" ? bb.line : 0,
+          description: translateToPortuguese(typeof bb.description === "string" ? bb.description : "Sem descrição"),
+          suggestion: translateToPortuguese(typeof bb.suggestion === "string" ? bb.suggestion : "Sem sugestão"),
+        };
+      });
+
+    return { bugs };
+  } catch {
+    return null;
   }
 }

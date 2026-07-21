@@ -5,7 +5,7 @@ export const mockAnalysisResult: ReporterOutput = {
   filesAnalyzed: 47,
   overallScore: 67,
   executiveSummary:
-    "O repositório apresenta uma arquitetura bem organizada com padrões reconhecíveis, porém possui vulnerabilidades críticas de segurança que precisam ser endereçadas urgentemente. A qualidade de código é regular, com algumas funções excessivamente longas e uso de tipos inconsistentes. A documentação está parcialmente completa, faltando JSDoc em várias funções exportadas.",
+    "O repositório apresenta uma arquitetura bem organizada com padrões reconhecíveis, porém possui vulnerabilidades críticas de segurança que precisam ser endereçadas urgentemente. A qualidade de código é regular, com algumas funções excessivamente longas e uso de tipos inconsistentes.",
   generatedAt: new Date().toISOString(),
   sections: {
     quality: {
@@ -163,68 +163,6 @@ export const mockAnalysisResult: ReporterOutput = {
             "Em produção, retornar apenas mensagem genérica. Logar stack trace internamente. Usar middleware de tratamento de erros que filtra dados sensíveis.",
           owasp: "A04:2021 - Insecure Design",
         },
-      ],
-    },
-    documentation: {
-      readme: "# Meu Projeto\n\n## Instalação\n\n```bash\nnpm install\nnpm run dev\n```\n\n## Como usar\n\nApós iniciar o servidor, acesse `http://localhost:3000`.\n\n## Estrutura do projeto\n\n```\nsrc/\n├── components/   # Componentes React\n├── services/     # Serviços de API\n├── hooks/        # Custom hooks\n├── utils/        # Utilitários\n└── config/       # Configurações\n```\n\n## Tecnologias utilizadas\n\n- React 18\n- TypeScript\n- Node.js + Express\n- PostgreSQL",
-      missingDocs: [
-        {
-          file: "src/services/api.ts",
-          description:
-            "Função exportada 'fetchUserData' sem comentário JSDoc.",
-        },
-        {
-          file: "src/hooks/useAuth.ts",
-          description:
-            "Hook exportado 'useAuth' sem documentação de parâmetros e retorno.",
-        },
-        {
-          file: "src/utils/helpers.ts",
-          description:
-            "Função 'processData' sem descrição do que realiza e quais são suas side effects.",
-        },
-        {
-          file: "src/database/queries.ts",
-          description:
-            "Função 'findUserById' sem documentação sobre comportamento em caso de não encontrado.",
-        },
-        {
-          file: "src/components/Header.tsx",
-          description:
-            "Componente 'Header' sem props documentadas.",
-        },
-      ],
-    },
-    architecture: {
-      structure: {
-        folders: [
-          "src/",
-          "src/components/",
-          "src/services/",
-          "src/hooks/",
-          "src/utils/",
-          "src/config/",
-          "src/database/",
-          "tests/",
-        ],
-        layers: ["controllers", "services", "models", "views"],
-      },
-      dependencies: [
-        { from: "src/components/Header.tsx", to: "src/hooks/useAuth.ts" },
-        { from: "src/components/UserList.tsx", to: "src/services/api.ts" },
-        { from: "src/services/api.ts", to: "src/config/env.ts" },
-        { from: "src/database/queries.ts", to: "src/config/env.ts" },
-        { from: "src/hooks/useAuth.ts", to: "src/services/api.ts" },
-      ],
-      patterns: [
-        "Custom Hooks Pattern",
-        "Service Layer",
-        "Component-Based Architecture",
-      ],
-      suggestions: [
-        "Separar a lógica de negócio dos componentes React criando uma camada de hooks dedicada para cada feature.",
-        "Implementar um repositório abstrato entre services e database para facilitar testes e troca de ORM.",
-        "Adicionar barrel exports (index.ts) em cada pasta para simplificar imports e reduzir acoplamento entre módulos.",
       ],
     },
   },

@@ -43,27 +43,6 @@ export type SecurityAuditorOutput = {
   summary: string;
 };
 
-export type DocWriterOutput = {
-  readme: string;
-  missingDocs: Array<{
-    file: string;
-    description: string;
-  }>;
-};
-
-export type ArchitectOutput = {
-  structure: {
-    folders: string[];
-    layers: string[];
-  };
-  dependencies: Array<{
-    from: string;
-    to: string;
-  }>;
-  patterns: string[];
-  suggestions: string[];
-};
-
 export type ReporterOutput = {
   repoUrl: string;
   filesAnalyzed: number;
@@ -73,8 +52,6 @@ export type ReporterOutput = {
     quality: CodeAnalyzerOutput | null;
     bugs: BugHunterOutput | null;
     security: SecurityAuditorOutput | null;
-    documentation: DocWriterOutput | null;
-    architecture: ArchitectOutput | null;
   };
   generatedAt: string;
 };

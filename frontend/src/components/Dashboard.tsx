@@ -1,11 +1,10 @@
 import { type FC, useState } from "react";
-import { Shield, Bug, FileText, BarChart3, FolderTree, Download } from "lucide-react";
+import { Shield, Bug, BarChart3, Download } from "lucide-react";
 import jsPDF from "jspdf";
 import type { ReporterOutput } from "../types";
 import { ScoreCard } from "./ScoreCard";
 import { SecurityPanel } from "./SecurityPanel";
 import { BugList } from "./BugList";
-import { DocPreview } from "./DocPreview";
 
 type DashboardProps = {
   report: ReporterOutput;
@@ -37,10 +36,6 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
   const qualityScore = report.sections.quality?.score ?? 0;
   const bugCount = report.sections.bugs?.bugs.length ?? 0;
   const securityScore = report.sections.security?.score ?? 0;
-  const docCount = report.sections.documentation?.missingDocs.length ?? 0;
-
-  const archStructure = report.sections.architecture?.structure;
-  const archPatterns = report.sections.architecture?.patterns ?? [];
 
   const handleDownloadPDF = () => {
     if (generating) return;
@@ -64,7 +59,7 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
         }
       };
 
-      // === HEADER ===
+      // HEADER
       doc.setFontSize(20);
       doc.setTextColor(30, 30, 30);
       doc.text("CodeLens AI", W / 2, y, { align: "center" });
@@ -87,7 +82,7 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
       y += 8;
       addLine();
 
-      // === EXECUTIVE SUMMARY ===
+      // EXECUTIVE SUMMARY
       doc.setFontSize(12);
       doc.setTextColor(30, 30, 30);
       doc.text("Resumo Executivo", 15, y);
@@ -100,7 +95,7 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
       y += summaryLines.length * 4 + 4;
       addLine();
 
-      // === SECURITY ===
+      // SECURITY
       if (report.sections.security) {
         checkPage(20);
         doc.setFontSize(12);
@@ -146,7 +141,7 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
         addLine();
       }
 
-      // === BUGS ===
+      // BUGS
       if (report.sections.bugs) {
         checkPage(15);
         doc.setFontSize(12);
@@ -171,7 +166,7 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
         addLine();
       }
 
-      // === QUALITY ===
+      // QUALITY
       if (report.sections.quality) {
         checkPage(15);
         doc.setFontSize(12);
@@ -199,56 +194,9 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
           doc.text(issueDesc, 19, y);
           y += issueDesc.length * 3.5 + 2;
         }
-        addLine();
       }
 
-      // === DOCUMENTATION ===
-      if (report.sections.documentation) {
-        checkPage(15);
-        doc.setFontSize(12);
-        doc.setTextColor(30, 30, 30);
-        doc.text(`Documentacao (${docCount} itens pendentes)`, 15, y);
-        y += 6;
-
-        for (const md of report.sections.documentation.missingDocs.slice(0, 10)) {
-          checkPage(8);
-          doc.setFontSize(9);
-          doc.setTextColor(80, 80, 80);
-          doc.text(`- ${md.file}: ${md.description}`, 19, y);
-          y += 4;
-        }
-        addLine();
-      }
-
-      // === ARCHITECTURE ===
-      if (report.sections.architecture) {
-        checkPage(15);
-        doc.setFontSize(12);
-        doc.setTextColor(30, 30, 30);
-        doc.text("Arquitetura", 15, y);
-        y += 6;
-
-        doc.setFontSize(9);
-        doc.setTextColor(80, 80, 80);
-        if (archPatterns.length > 0) {
-          doc.text(`Padroes: ${archPatterns.join(", ")}`, 15, y);
-          y += 5;
-        }
-        if (report.sections.architecture.suggestions.length > 0) {
-          doc.setFont("helvetica", "bold");
-          doc.text("Sugestoes:", 15, y);
-          y += 5;
-          doc.setFont("helvetica", "normal");
-          for (const sug of report.sections.architecture.suggestions) {
-            checkPage(8);
-            const sugLines = doc.splitTextToSize(`- ${sug}`, W - 30);
-            doc.text(sugLines, 19, y);
-            y += sugLines.length * 3.5 + 1;
-          }
-        }
-      }
-
-      // === FOOTER ===
+      // FOOTER
       const pageCount = doc.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
@@ -274,7 +222,6 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
-      {/* Top buttons */}
       <div className="flex items-center justify-between">
         <button
           onClick={onNewAnalysis}
@@ -293,11 +240,9 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
       </div>
 
       <div className="space-y-6">
-        {/* 1. ScoreCard */}
         <ScoreCard score={report.overallScore} />
 
-        {/* 2. Summary grid */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-3 gap-4">
           <SummaryCard
             icon={BarChart3}
             title="Qualidade"
@@ -316,15 +261,8 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
             value={`${securityScore}/100`}
             color="bg-red-100 text-red-600"
           />
-          <SummaryCard
-            icon={FileText}
-            title="Documentação"
-            value={`${docCount} pendentes`}
-            color="bg-green-100 text-green-600"
-          />
         </div>
 
-        {/* 3. SecurityPanel */}
         {report.sections.security && (
           <SecurityPanel
             vulnerabilities={report.sections.security.vulnerabilities}
@@ -332,75 +270,8 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
           />
         )}
 
-        {/* 4. BugList */}
         {report.sections.bugs && (
           <BugList bugs={report.sections.bugs.bugs} />
-        )}
-
-        {/* 5. DocPreview */}
-        {report.sections.documentation && (
-          <DocPreview readme={report.sections.documentation.readme} />
-        )}
-
-        {/* 6. Architecture map */}
-        {archStructure && (
-          <div className="rounded-xl bg-white p-4 shadow-md sm:p-6">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-lg bg-indigo-100 p-2">
-                <FolderTree className="h-6 w-6 text-indigo-600" />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800 sm:text-2xl">
-                Mapa de Arquitetura
-              </h2>
-            </div>
-
-            <div className="mb-4">
-              <h3 className="mb-2 text-sm font-semibold text-gray-500">
-                Pastas
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {archStructure.folders.map((folder) => (
-                  <span
-                    key={folder}
-                    className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
-                  >
-                    {folder}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {archStructure.layers.length > 0 && (
-              <div className="mb-4">
-                <h3 className="mb-2 text-sm font-semibold text-gray-500">
-                  Camadas
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {archStructure.layers.map((layer) => (
-                    <span
-                      key={layer}
-                      className="rounded-lg bg-indigo-100 px-3 py-1.5 text-sm text-indigo-700"
-                    >
-                      {layer}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {archPatterns.length > 0 && (
-              <div>
-                <h3 className="mb-2 text-sm font-semibold text-gray-500">
-                  Padrões Identificados
-                </h3>
-                <ul className="list-inside list-disc space-y-1 text-sm text-gray-600">
-                  {archPatterns.map((pattern) => (
-                    <li key={pattern}>{pattern}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
         )}
       </div>
     </div>

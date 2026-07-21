@@ -46,7 +46,7 @@ function App() {
       {stage === "loading" && (
         <LoadingState
           currentStage={currentMessage}
-          currentAgent="Claude AI"
+          currentAgent="Groq AI"
         />
       )}
 

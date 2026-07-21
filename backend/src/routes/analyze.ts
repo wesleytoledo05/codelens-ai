@@ -87,8 +87,6 @@ router.post("/analyze", async (req, res) => {
       codeAnalyzer: toNull(ar.codeAnalyzer),
       bugHunter: toNull(ar.bugHunter),
       securityAuditor: toNull(ar.securityAuditor),
-      docWriter: toNull(ar.docWriter),
-      architect: toNull(ar.architect),
       repoUrl,
       filesAnalyzed: orchestratorResult.filesAnalyzed,
     });

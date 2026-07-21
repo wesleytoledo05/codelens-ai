@@ -4,8 +4,6 @@ import {
   Cpu,
   Shield,
   Bug,
-  BookOpen,
-  LayoutGrid,
   BarChart3,
   Download,
 } from "lucide-react";
@@ -93,7 +91,7 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
             Como funciona a análise
           </h2>
           <p className="mb-6 text-center text-sm text-gray-500">
-            Fluxo completo em 7 etapas — do URL ao relatório final
+            Fluxo completo em 5 etapas — do URL ao relatório final
           </p>
 
           <div className="space-y-0">
@@ -108,13 +106,13 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
                 step: 2,
                 icon: <Cpu size={18} className="text-indigo-600" />,
                 title: "Code Analyzer",
-                desc: "Analisa a qualidade geral do código: complexidade ciclomática (quantidade deifs/loops aninhados), duplicação entre arquivos, tamanho de funções (suspeitas acima de 50 linhas), nomenclatura de variáveis (nomes genéricos como data, temp, x), cobertura de tipos TypeScript (uso excessivo de any) e comentários excessivos que indicam código pouco claro. Gera um score de 0 a 100.",
+                desc: "Analisa a qualidade geral do código: complexidade ciclomática (quantidade de ifs/loops aninhados), duplicação entre arquivos, tamanho de funções (suspeitas acima de 50 linhas), nomenclatura de variáveis (nomes genéricos como data, temp, x), cobertura de tipos TypeScript (uso excessivo de any) e comentários excessivos que indicam código pouco claro. Gera um score de 0 a 100.",
               },
               {
                 step: 3,
                 icon: <Bug size={18} className="text-orange-600" />,
                 title: "Bug Hunter",
-                desc: "Detecta bugs potenciais e code smells: código morto (funções/variáveis nunca usadas), condições logicamente impossíveis (x > 10 && x < 5), acesso a null/undefined sem verificação, loops potencialmente infinitos, vazamento de memória (listeners não removidos, intervals não limpos), antipatterns (callback hell, magic numbers, mutação direta de estado em React), e Promises sem tratamento de erro (.catch() ausente ou await sem try/catch).",
+                desc: "Detecta bugs potenciais e code smells: código morto (funções/variáveis nunca usadas), condições logicamente impossíveis (x > 10 && x < 5), acesso a null/undefined sem verificação, loops potencialmente infinitos, vazamento de memória (listeners não removidos, intervals não limpos), antipatterns (callback hell, magic numbers, mutação direta de estado em React), e Promises sem tratamento de erro.",
               },
               {
                 step: 4,
@@ -124,21 +122,9 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
               },
               {
                 step: 5,
-                icon: <BookOpen size={18} className="text-green-600" />,
-                title: "Doc Writer",
-                desc: "Gera documentação técnica completa: cria um README com seções obrigatórias (título + descrição, Instalação, Como usar, Estrutura do projeto, Tecnologias utilizadas). Identifica funções e classes exportadas sem documentação JSDoc, listando até 20 itens mais críticos. Se já existir um README, usa como base e sugere melhorias.",
-              },
-              {
-                step: 6,
-                icon: <LayoutGrid size={18} className="text-purple-600" />,
-                title: "Architect",
-                desc: "Mapeia a arquitetura do repositório: organizações de pastas e camadas (controllers, services, models), relações de import/export entre arquivos (dependências diretas), padrões de design reconhecíveis (MVC, Repository, Singleton), acoplamento excessivo entre módulos, e ausência de separação de responsabilidades. Gera sugestões acionáveis de melhoria estrutural.",
-              },
-              {
-                step: 7,
                 icon: <BarChart3 size={18} className="text-blue-600" />,
                 title: "Reporter + Score Final",
-                desc: "Consolida os resultados dos 5 agentes em um único relatório estruturado. Calcula o score geral com pesos: Security Auditor 35% (mais crítico), Code Analyzer 25%, Bug Hunter 20%, Architect 10%, Doc Writer 10%. Para agentes sem score numérico (Bug Hunter, Architect, Doc Writer), o score é derivado automaticamente: bugs por severidade, padrões arquiteturais identificados, e cobertura de documentação. Gera um resumo executivo em linguagem natural via Claude IA, compreensível para não-técnicos. O resultado é exibido no Dashboard com score animado, grid de resumo, painel de segurança com vulnerabilidades expandíveis, lista de bugs agrupados por arquivo, preview do README com botão copiar, mapa de arquitetura, e opção de gerar PDF do relatório completo.",
+                desc: "Consolida os resultados dos 3 agentes em um único relatório estruturado. Calcula o score geral com pesos: Security Auditor 45% (mais crítico), Code Analyzer 35%, Bug Hunter 20%. Gera um resumo executivo em linguagem natural via IA, compreensível para não-técnicos. O resultado é exibido no Dashboard com score animado, grid de resumo, painel de segurança com vulnerabilidades expandíveis, lista de bugs agrupados por arquivo, e opção de gerar PDF do relatório completo.",
               },
             ].map((item, i) => (
               <div key={item.step}>
@@ -148,7 +134,7 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-100 ring-2 ring-gray-200">
                       {item.icon}
                     </div>
-                    {i < 6 && (
+                    {i < 4 && (
                       <div className="flex-1 w-px bg-gray-200 my-1" />
                     )}
                   </div>
@@ -159,7 +145,7 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
                       <span className="text-xs font-bold text-gray-400">
                         ETAPA {item.step}
                       </span>
-                      {item.step >= 2 && item.step <= 6 && (
+                      {item.step >= 2 && item.step <= 4 && (
                         <span className="rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-medium text-indigo-600">
                           IA
                         </span>
@@ -179,10 +165,10 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
 
           <div className="mt-2 rounded-lg bg-indigo-50 p-4 text-center">
             <p className="text-sm font-medium text-indigo-800">
-              Etapas 2 a 6 rodam em paralelo via Claude AI (claude-sonnet-4-6)
+              Etapas 2 a 6 rodam em paralelo via Groq AI (llama-3.1-8b-instant)
             </p>
             <p className="text-xs text-indigo-500">
-              Tempo estimado: 1-2 minutos depending do tamanho do repositório
+              Tempo estimado: 1-2 minutos depende do tamanho do repositório
             </p>
           </div>
         </div>
