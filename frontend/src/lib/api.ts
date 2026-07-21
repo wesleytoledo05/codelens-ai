@@ -17,8 +17,6 @@ const MOCK_STAGES = [
   "Code Analyzer analisando qualidade do código...",
   "Bug Hunter detectando antipatterns e code smells...",
   "Security Auditor verificando vulnerabilidades OWASP...",
-  "Doc Writer gerando documentação técnica...",
-  "Architect mapeando estrutura e dependências...",
   "Reporter consolidando resultados...",
   "Gerando relatório final...",
 ];

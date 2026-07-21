@@ -30,7 +30,7 @@ const SYSTEM_PROMPT = `...`;
 // 3. Função principal do agente
 export async function runNomeDoAgente(input: InputType): Promise<OutputType> {
   // monta o prompt com os dados de entrada
-  // chama o Claude API (model: claude-sonnet-4-6)
+  // chama o Groq API (model: llama-3.1-8b-instant)
   // faz parse da resposta com o OutputSchema.parse()
   // se falhar o parse, faz 1 retry pedindo correção do formato
   // retorna o resultado tipado
