@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mimoChat } from "../lib/mimo-client";
+import type { ApiKeys } from "../types";
 
 const SecurityAuditorOutputSchema = z.object({
   vulnerabilities: z.array(z.object({
@@ -23,7 +24,7 @@ export type SecurityAuditorInput = {
     content: string;
     extension: string;
   }>;
-};
+} & ApiKeys;
 
 export type SecurityAuditorOutput = z.infer<typeof SecurityAuditorOutputSchema>;
 
@@ -55,6 +56,7 @@ function extractJSON(response: string): unknown {
 export async function runSecurityAuditor(
   input: SecurityAuditorInput
 ): Promise<SecurityAuditorOutput> {
+  const apiKey = input.groqApiKey;
   const filesDescription = input.files
     .map((f) => `--- ${f.path} ---\n${f.content}`)
     .join("\n\n");
@@ -79,7 +81,7 @@ Score: sem vulns CRITICAL/HIGH = 80-100, com CRITICAL = 0-40, sem vulns = 95-100
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      { maxTokens: 8192 }
+      { maxTokens: 8192, apiKey }
     );
   } catch (error) {
     throw new AgentExecutionError("SecurityAuditor", "Failed to call AI API", error);
@@ -109,7 +111,7 @@ Score: sem vulns CRITICAL/HIGH = 80-100, com CRITICAL = 0-40, sem vulns = 95-100
             content: "Sua resposta não era JSON válido. Retorne APENAS um objeto JSON válido. Sem markdown, sem texto antes ou depois.",
           },
         ],
-        { maxTokens: 8192 }
+        { maxTokens: 8192, apiKey }
       );
       const raw = extractJSON(retryText);
       const result = SecurityAuditorOutputSchema.safeParse(raw);

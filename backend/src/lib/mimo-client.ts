@@ -9,24 +9,6 @@ export type Provider = "gemini" | "groq" | "openrouter";
 
 const PROVIDER: Provider = (process.env.AI_PROVIDER as Provider) || "groq";
 
-// --- Gemini client (Google AI Studio — free) ---
-const geminiClient = new OpenAI({
-  baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
-  apiKey: process.env.GEMINI_API_KEY || "",
-});
-
-// --- Groq client (free, fast inference) ---
-const groqClient = new OpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY || "",
-});
-
-// --- OpenRouter client (free models) ---
-const openrouterClient = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || "",
-});
-
 // --- Model selection per provider ---
 const MODELS: Record<Provider, string> = {
   gemini: process.env.GEMINI_MODEL || "gemini-2.0-flash",
@@ -34,15 +16,35 @@ const MODELS: Record<Provider, string> = {
   openrouter: process.env.OPENROUTER_MODEL || "google/gemma-3-12b-it:free",
 };
 
-function getClient(): OpenAI {
+// Client cache keyed by API key to avoid creating new instances per request
+const clientCache = new Map<string, OpenAI>();
+
+function getClient(overrideApiKey?: string): OpenAI {
+  const cacheKey = `${PROVIDER}:${overrideApiKey || "env"}`;
+  const cached = clientCache.get(cacheKey);
+  if (cached) return cached;
+
+  let apiKey: string;
+  let baseURL: string;
+
   switch (PROVIDER) {
     case "gemini":
-      return geminiClient;
+      apiKey = overrideApiKey || process.env.GEMINI_API_KEY || "";
+      baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+      break;
     case "groq":
-      return groqClient;
+      apiKey = overrideApiKey || process.env.GROQ_API_KEY || "";
+      baseURL = "https://api.groq.com/openai/v1";
+      break;
     case "openrouter":
-      return openrouterClient;
+      apiKey = overrideApiKey || process.env.OPENROUTER_API_KEY || "";
+      baseURL = "https://openrouter.ai/api/v1";
+      break;
   }
+
+  const client = new OpenAI({ baseURL, apiKey });
+  clientCache.set(cacheKey, client);
+  return client;
 }
 
 function getModel(): string {
@@ -60,14 +62,14 @@ function sleep(ms: number): Promise<void> {
 
 export async function mimoChat(
   messages: ChatMessage[],
-  options?: { maxTokens?: number; temperature?: number; retries?: number }
+  options?: { maxTokens?: number; temperature?: number; retries?: number; apiKey?: string }
 ): Promise<string> {
   const maxRetries = options?.retries ?? 2;
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const client = getClient();
+      const client = getClient(options?.apiKey);
       const model = getModel();
 
       const response = await client.chat.completions.create({
@@ -139,7 +141,7 @@ export function limitFiles(files: FileInput[]): FileInput[] {
 
 export async function mimoChatWithRetry(
   messages: ChatMessage[],
-  options?: { maxTokens?: number; temperature?: number },
+  options?: { maxTokens?: number; temperature?: number; apiKey?: string },
   maxRetries = 1
 ): Promise<string> {
   let lastError: unknown;
