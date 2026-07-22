@@ -75,7 +75,7 @@ export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAna
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
-      { maxTokens: 4096, apiKey }
+      { maxTokens: 2048, apiKey }
     );
 
     const parsed = extractJSON(response);
@@ -99,7 +99,7 @@ export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAna
           content: "Your previous response was not valid JSON. Return ONLY a valid JSON object matching the required structure. No markdown, no explanation.",
         },
       ],
-      { maxTokens: 4096, apiKey }
+      { maxTokens: 2048, apiKey }
     );
 
     const parsed = extractJSON(retryResponse);

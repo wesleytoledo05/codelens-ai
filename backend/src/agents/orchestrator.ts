@@ -70,7 +70,8 @@ async function safeRun<T>(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : `Falha desconhecida no agente ${agentName}`;
-    console.error(`[Orchestrator] ${agentName} failed: ${message}`);
+    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : "";
+    console.error(`[Orchestrator] ${agentName} failed: ${message}${cause ? ` (cause: ${cause})` : ""}`);
     return { error: true, message };
   }
 }
@@ -129,16 +130,16 @@ export async function runOrchestrator(
     };
   }
 
-  // Run 3 agents sequentially with delays to respect Groq TPM limits
+  // Run 3 agents sequentially with delays to respect Groq TPM limits (6000 TPM)
   const agentInput = { files: limitFiles(files), groqApiKey };
   const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const agentsPromise = (async () => {
     const results: unknown[] = [];
     results.push(await safeRun(() => runCodeAnalyzer(agentInput as CodeAnalyzerInput), "CodeAnalyzer"));
-    await delay(10000); // Wait 10s for TPM to partially reset
+    await delay(20000); // Wait 20s for TPM to reset (free tier: 6000 TPM)
     results.push(await safeRun(() => runBugHunter(agentInput as BugHunterInput), "BugHunter"));
-    await delay(10000); // Wait 10s for TPM to partially reset
+    await delay(20000); // Wait 20s for TPM to reset
 
     // Security auditor gets its own 60s timeout so it always has time to run
     const securityTimeout = new Promise<never>((_, reject) =>

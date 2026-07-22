@@ -144,7 +144,9 @@ Isso é comportamento esperado de modelos de linguagem — não é um bug.
 | Timeout global | 120s | Não |
 | Timeout do SecurityAuditor | 60s | Não |
 | TPM da Groq (free tier) | 6.000 | Não (plano) |
-| Temperature do modelo | 0.3 | Não |
+| Temperature do modelo | 0.2 | Não |
+| Delay entre agentes | 20s | Não |
+| Max tokens de saída | 2.048 (agentes) / 4.096 (security) | Não |
 
 ---
 

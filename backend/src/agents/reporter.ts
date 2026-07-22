@@ -209,6 +209,22 @@ async function generateExecutiveSummary(
     lastError = error;
   }
 
+  // Third attempt with even simpler prompt
+  try {
+    const thirdResponse = await mimoChat(
+      [
+        {
+          role: "user",
+          content: `Resuma em 2 frases em português: Score ${overallScore}/100, ${input.filesAnalyzed} arquivos.`,
+        },
+      ],
+      { maxTokens: 256, apiKey }
+    );
+    if (thirdResponse) return thirdResponse.trim();
+  } catch (error) {
+    lastError = error;
+  }
+
   if (lastError) {
     console.warn("[Reporter] Failed to generate executive summary via AI, using fallback");
   }
