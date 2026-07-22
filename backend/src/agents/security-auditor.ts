@@ -81,7 +81,7 @@ Score: sem vulns CRITICAL/HIGH = 80-100, com CRITICAL = 0-40, sem vulns = 95-100
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      { maxTokens: 8192, apiKey }
+      { maxTokens: 4096, apiKey }
     );
   } catch (error) {
     throw new AgentExecutionError("SecurityAuditor", "Failed to call AI API", error);
@@ -111,7 +111,7 @@ Score: sem vulns CRITICAL/HIGH = 80-100, com CRITICAL = 0-40, sem vulns = 95-100
             content: "Sua resposta não era JSON válido. Retorne APENAS um objeto JSON válido. Sem markdown, sem texto antes ou depois.",
           },
         ],
-        { maxTokens: 8192, apiKey }
+        { maxTokens: 4096, apiKey }
       );
       const raw = extractJSON(retryText);
       const result = SecurityAuditorOutputSchema.safeParse(raw);

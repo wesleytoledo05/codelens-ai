@@ -25,6 +25,17 @@ router.post("/analyze", async (req, res) => {
 
   const { repoUrl, groqApiKey, githubToken } = parsed.data;
 
+  const hasUserKey = !!(groqApiKey && groqApiKey.trim().length > 0);
+  const hasEnvKey = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 0);
+  console.log(`[analyze] URL: ${repoUrl}, UserKey: ${hasUserKey}, EnvKey: ${hasEnvKey}, Token: ${!!githubToken}`);
+
+  if (!hasUserKey && !hasEnvKey) {
+    res.status(400).json({
+      error: "Chave de API Groq não configurada. Configure sua chave em Config API (canto superior direito). Obtenha uma gratuita em console.groq.com",
+    });
+    return;
+  }
+
   if (!REPO_URL_REGEX.test(repoUrl)) {
     res.status(400).json({
       error: "URL inválida. Use o formato: https://github.com/{owner}/{repo}",

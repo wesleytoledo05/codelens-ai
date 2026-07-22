@@ -105,7 +105,7 @@ Lembre-se: description e suggestion DEVEM estar em português brasileiro.`;
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
-      { maxTokens: 4096, apiKey }
+      { maxTokens: 2048, apiKey }
     );
   } catch (error) {
     throw new AgentExecutionError(
@@ -131,7 +131,7 @@ Lembre-se: description e suggestion DEVEM estar em português brasileiro.`;
             content: "Your response was not valid JSON. Respond with ONLY a valid JSON object. No markdown, no explanation.",
           },
         ],
-        { maxTokens: 4096, apiKey }
+        { maxTokens: 2048, apiKey }
       );
       parsed = extractJSON(retryResponse);
     } catch (retryError) {
