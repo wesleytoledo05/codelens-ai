@@ -83,7 +83,9 @@ Consolida todas as análises em um relatório executivo único.
 
 ## Inteligência Artificial
 
-- Claude API (Anthropic)
+- Groq API (llama-3.1-8b-instant)
+- Gemini (fallback)
+- OpenRouter (fallback)
 - Zod
 
 ## Infraestrutura
@@ -91,6 +93,58 @@ Consolida todas as análises em um relatório executivo único.
 - Vercel
 - Railway
 - GitHub Actions
+
+---
+
+# ⚠️ Limitações Técnicas
+
+## Por que nem todos os arquivos são analisados
+
+O CodeLens AI utiliza a **API gratuita da Groq**, que possui limites rígidos de uso:
+
+- **6.000 Tokens Por Minuto (TPM)** no tier gratuito
+- Cada um dos 3 agentes de IA (CodeAnalyzer, BugHunter, SecurityAuditor) envia **todo o conteúdo dos arquivos em um único prompt**
+- O timeout global da análise é de **120 segundos**, com delays de 10s entre agentes para respeitar o rate limit
+
+Para garantir que a análise execute sem erros de rate limit, o sistema aplica duas camadas de limitação:
+
+### 1. Limite de arquivos (máximo 300)
+
+O repositório é escaneado e os arquivos são filtrados automaticamente:
+- **Excluídos**: `node_modules/`, `.git/`, `dist/`, `build/`, `.next/`, `coverage/`, imagens, fontes, lock files
+- **Priorizados**: pastas `src/`, `app/`, `lib/`, `components/` vêm primeiro
+- Se houver mais de 300 arquivos relevantes, apenas os 300 com maior prioridade são mantidos
+
+### 2. Limite de conteúdo (2.000 caracteres por agente)
+
+Mesmo com até 300 arquivos baixados, o **conteúdo total** enviado a cada agente de IA é limitado a **2.000 caracteres** (configurável via variável de ambiente `MAX_INPUT_CHARS`).
+
+Isso significa:
+- Arquivos pequenos (100 chars) → ~20 arquivos analisados de fato
+- Arquivos médios (500 chars) → ~4 arquivos analisados
+- Arquivos grandes podem ser truncados no meio
+
+**Por quê?** O token equivalente a 2.000 caracteres já consome uma parcela significativa do orçamento de 6.000 TPM. Enviar mais ultrapassaria o limite e causaria erros 429 (rate limit), interrompendo a análise.
+
+### 3. Resultados podem variar
+
+Como a IA utilizada (LLM) é **não-determinística** (mesmo com temperature 0.3), execuções diferentes do mesmo repositório podem gerar:
+- Severidades diferentes para os mesmos bugs
+- Issues encontradas ou não encontradas
+- Scores levemente diferentes
+
+Isso é comportamento esperado de modelos de linguagem — não é um bug.
+
+### Resumo das limitações
+
+| Parâmetro | Valor | Configurável |
+|-----------|-------|-------------|
+| Máximo de arquivos baixados | 300 | Não |
+| Conteúdo máximo por agente | 2.000 chars | Sim (`MAX_INPUT_CHARS`) |
+| Timeout global | 120s | Não |
+| Timeout do SecurityAuditor | 60s | Não |
+| TPM da Groq (free tier) | 6.000 | Não (plano) |
+| Temperature do modelo | 0.3 | Não |
 
 ---
 
@@ -107,7 +161,7 @@ O objetivo é transformar cada vulnerabilidade em uma oportunidade de aprendizad
 ## Pré-requisitos
 
 - Node.js 18+
-- Chave da API da Anthropic
+- Chave da API da Groq (gratuita em console.groq.com)
 - GitHub Personal Access Token (opcional para repositórios públicos)
 
 ## Instalação
@@ -126,7 +180,10 @@ npm install
 Crie um arquivo `.env`
 
 ```env
-ANTHROPIC_API_KEY=your_key
+AI_PROVIDER=groq
+GROQ_API_KEY=your_key
+GROQ_MODEL=llama-3.1-8b-instant
+GITHUB_TOKEN=your_token  # opcional
 ```
 
 ### Frontend

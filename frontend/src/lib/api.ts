@@ -5,6 +5,11 @@ import { mockAnalysisResult } from "../mocks/analysisResult";
 const BASE_URL: string =
   import.meta.env.VITE_API_URL || "http://localhost:3001";
 
+type ApiKeys = {
+  groqApiKey: string;
+  githubToken: string;
+};
+
 type Callbacks = {
   onProgress: (message: string) => void;
   onComplete: (report: ReporterOutput) => void;
@@ -31,12 +36,17 @@ async function mockStreamAnalysis(callbacks: Callbacks): Promise<void> {
 
 async function realStreamAnalysis(
   repoUrl: string,
-  callbacks: Callbacks
+  callbacks: Callbacks,
+  keys?: ApiKeys
 ): Promise<void> {
   const response = await fetch(`${BASE_URL}/analyze`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ repoUrl }),
+    body: JSON.stringify({
+      repoUrl,
+      groqApiKey: keys?.groqApiKey || undefined,
+      githubToken: keys?.githubToken || undefined,
+    }),
   });
 
   if (!response.ok) {
@@ -99,10 +109,11 @@ async function realStreamAnalysis(
 
 export async function streamAnalysis(
   repoUrl: string,
-  callbacks: Callbacks
+  callbacks: Callbacks,
+  keys?: ApiKeys
 ): Promise<void> {
   if (USE_MOCK) {
     return mockStreamAnalysis(callbacks);
   }
-  return realStreamAnalysis(repoUrl, callbacks);
+  return realStreamAnalysis(repoUrl, callbacks, keys);
 }

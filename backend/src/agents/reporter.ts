@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mimoChat } from "../lib/mimo-client";
+import type { ApiKeys } from "../types";
 
 import type { BugHunterOutput } from "./bug-hunter";
 import type { SecurityAuditorOutput } from "./security-auditor";
@@ -26,7 +27,7 @@ export type ReporterInput = {
   securityAuditor: SecurityAuditorOutput | null;
   repoUrl: string;
   filesAnalyzed: number;
-};
+} & ApiKeys;
 
 const ReporterOutputSchema = z.object({
   repoUrl: z.string(),
@@ -89,6 +90,7 @@ function getBugHunterScore(output: BugHunterOutput | null): number {
 export async function runReporter(
   input: ReporterInput
 ): Promise<z.infer<typeof ReporterOutputSchema>> {
+  const apiKey = input.groqApiKey;
   const scores = {
     securityAuditor: getAgentScore(input.securityAuditor),
     codeAnalyzer: getAgentScore(input.codeAnalyzer),
@@ -102,7 +104,8 @@ export async function runReporter(
 
   const executiveSummary = await generateExecutiveSummary(
     input,
-    Math.round(overallScore)
+    Math.round(overallScore),
+    apiKey
   );
 
   const output = {
@@ -131,7 +134,8 @@ export async function runReporter(
 
 async function generateExecutiveSummary(
   input: ReporterInput,
-  overallScore: number
+  overallScore: number,
+  apiKey?: string
 ): Promise<string> {
   const contextParts: string[] = [];
 
@@ -177,7 +181,7 @@ async function generateExecutiveSummary(
           content: `Gere um resumo executivo 2-3 frases em português baseado nos seguintes dados:\n\n${contextText}`,
         },
       ],
-      { maxTokens: 512 }
+      { maxTokens: 512, apiKey }
     );
     if (response) return response.trim();
   } catch (error) {
@@ -198,7 +202,7 @@ async function generateExecutiveSummary(
           content: "Por favor, gere o resumo executivo em português, 2-3 frases, sem formatação markdown.",
         },
       ],
-      { maxTokens: 512 }
+      { maxTokens: 512, apiKey }
     );
     if (retryResponse) return retryResponse.trim();
   } catch (error) {

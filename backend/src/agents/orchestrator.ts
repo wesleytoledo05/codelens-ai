@@ -8,12 +8,13 @@ import {
   type SecurityAuditorInput,
   type SecurityAuditorOutput,
 } from "./security-auditor";
+import type { ApiKeys } from "../types";
 
 // --- Types ---
 
 export type OrchestratorInput = {
   repoUrl: string;
-};
+} & ApiKeys;
 
 type CodeAnalyzerOutput = {
   score: number;
@@ -83,6 +84,8 @@ const errorResult = (msg: string) => ({
 export async function runOrchestrator(
   input: OrchestratorInput
 ): Promise<OrchestratorOutput> {
+  const { groqApiKey, githubToken } = input;
+
   if (!GITHUB_URL_REGEX.test(input.repoUrl)) {
     return {
       status: "error",
@@ -94,7 +97,7 @@ export async function runOrchestrator(
 
   let files: Awaited<ReturnType<typeof fetchRepositoryFiles>>;
   try {
-    const fetchPromise = fetchRepositoryFiles(input.repoUrl, process.env.GITHUB_TOKEN);
+    const fetchPromise = fetchRepositoryFiles(input.repoUrl, githubToken || process.env.GITHUB_TOKEN);
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("TIMEOUT_EXCEEDED")), 120_000)
     );
@@ -127,7 +130,7 @@ export async function runOrchestrator(
   }
 
   // Run 3 agents sequentially with delays to respect Groq TPM limits
-  const agentInput = { files: limitFiles(files) };
+  const agentInput = { files: limitFiles(files), groqApiKey };
   const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const agentsPromise = (async () => {
@@ -136,7 +139,20 @@ export async function runOrchestrator(
     await delay(10000); // Wait 10s for TPM to partially reset
     results.push(await safeRun(() => runBugHunter(agentInput as BugHunterInput), "BugHunter"));
     await delay(10000); // Wait 10s for TPM to partially reset
-    results.push(await safeRun(() => runSecurityAuditor(agentInput as SecurityAuditorInput), "SecurityAuditor"));
+
+    // Security auditor gets its own 60s timeout so it always has time to run
+    const securityTimeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("SECURITY_TIMEOUT")), 60_000)
+    );
+    const securityResult = await Promise.race([
+      safeRun(() => runSecurityAuditor(agentInput as SecurityAuditorInput), "SecurityAuditor"),
+      securityTimeout,
+    ]).catch(() => ({
+      error: true as const,
+      message: "Security Auditor excedeu tempo limite próprio",
+    }));
+    results.push(securityResult);
+
     return results as [
       CodeAnalyzerOutput | AgentError,
       BugHunterOutput | AgentError,

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mimoChat } from "../lib/mimo-client";
+import type { ApiKeys } from "../types";
 
 // Types
 export type BugHunterInput = {
@@ -8,7 +9,7 @@ export type BugHunterInput = {
     content: string;
     extension: string;
   }>;
-};
+} & ApiKeys;
 
 export type BugHunterOutput = {
   bugs: Array<{
@@ -81,6 +82,7 @@ function extractJSON(response: string): unknown {
 export async function runBugHunter(
   input: BugHunterInput
 ): Promise<BugHunterOutput> {
+  const apiKey = input.groqApiKey;
   const filesContent = input.files
     .map((f) => `--- ${f.path} ---\n${f.content}`)
     .join("\n\n");
@@ -103,7 +105,7 @@ Lembre-se: description e suggestion DEVEM estar em português brasileiro.`;
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
-      { maxTokens: 4096 }
+      { maxTokens: 4096, apiKey }
     );
   } catch (error) {
     throw new AgentExecutionError(
@@ -129,7 +131,7 @@ Lembre-se: description e suggestion DEVEM estar em português brasileiro.`;
             content: "Your response was not valid JSON. Respond with ONLY a valid JSON object. No markdown, no explanation.",
           },
         ],
-        { maxTokens: 4096 }
+        { maxTokens: 4096, apiKey }
       );
       parsed = extractJSON(retryResponse);
     } catch (retryError) {

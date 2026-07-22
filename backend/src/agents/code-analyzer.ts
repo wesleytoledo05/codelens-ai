@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { mimoChat } from "../lib/mimo-client";
+import type { ApiKeys } from "../types";
 
 const OutputSchema = z.object({
   score: z.number().min(0).max(100),
@@ -25,7 +26,7 @@ export type CodeAnalyzerInput = {
     content: string;
     extension: string;
   }>;
-};
+} & ApiKeys;
 
 const SYSTEM_PROMPT = `You are a code quality analyzer. Analyze code and return ONLY valid JSON.
 
@@ -58,6 +59,7 @@ class AgentExecutionError extends Error {
 }
 
 export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAnalyzerOutput> {
+  const apiKey = input.groqApiKey;
   const fileContents = input.files
     .map((f) => `=== ${f.path} ===\n${f.content}`)
     .join("\n\n");
@@ -73,7 +75,7 @@ export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAna
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
       ],
-      { maxTokens: 4096 }
+      { maxTokens: 4096, apiKey }
     );
 
     const parsed = extractJSON(response);
@@ -97,7 +99,7 @@ export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAna
           content: "Your previous response was not valid JSON. Return ONLY a valid JSON object matching the required structure. No markdown, no explanation.",
         },
       ],
-      { maxTokens: 4096 }
+      { maxTokens: 4096, apiKey }
     );
 
     const parsed = extractJSON(retryResponse);
