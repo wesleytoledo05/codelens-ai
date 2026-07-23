@@ -130,20 +130,31 @@ export async function runOrchestrator(
     };
   }
 
-  // Run 3 agents sequentially with delays to respect Groq TPM limits (6000 TPM)
+  // Run 3 agents sequentially with 60s delays to respect Groq free tier TPM (6000 tokens/min)
+  // Each agent sends ~2000 tokens input + gets ~2000 tokens output = ~4000 tokens per agent
+  // With 60s gaps, each agent gets its own 1-minute TPM window
   const agentInput = { files: limitFiles(files), groqApiKey };
   const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const agentsPromise = (async () => {
     const results: unknown[] = [];
-    results.push(await safeRun(() => runCodeAnalyzer(agentInput as CodeAnalyzerInput), "CodeAnalyzer"));
-    await delay(20000); // Wait 20s for TPM to reset (free tier: 6000 TPM)
-    results.push(await safeRun(() => runBugHunter(agentInput as BugHunterInput), "BugHunter"));
-    await delay(20000); // Wait 20s for TPM to reset
 
-    // Security auditor gets its own 60s timeout so it always has time to run
+    console.log("[Orchestrator] Running CodeAnalyzer...");
+    results.push(await safeRun(() => runCodeAnalyzer(agentInput as CodeAnalyzerInput), "CodeAnalyzer"));
+
+    console.log("[Orchestrator] Waiting 65s for TPM window to reset...");
+    await delay(65000); // Wait 65s — well past the 1-minute TPM window
+
+    console.log("[Orchestrator] Running BugHunter...");
+    results.push(await safeRun(() => runBugHunter(agentInput as BugHunterInput), "BugHunter"));
+
+    console.log("[Orchestrator] Waiting 65s for TPM window to reset...");
+    await delay(65000); // Wait 65s for TPM reset
+
+    // Security auditor gets its own 90s timeout so it always has time to run
+    console.log("[Orchestrator] Running SecurityAuditor...");
     const securityTimeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("SECURITY_TIMEOUT")), 60_000)
+      setTimeout(() => reject(new Error("SECURITY_TIMEOUT")), 90_000)
     );
     const securityResult = await Promise.race([
       safeRun(() => runSecurityAuditor(agentInput as SecurityAuditorInput), "SecurityAuditor"),
@@ -154,6 +165,7 @@ export async function runOrchestrator(
     }));
     results.push(securityResult);
 
+    console.log("[Orchestrator] All 3 agents completed");
     return results as [
       CodeAnalyzerOutput | AgentError,
       BugHunterOutput | AgentError,
@@ -161,8 +173,9 @@ export async function runOrchestrator(
     ];
   })();
 
+  // Global timeout: 65s delay + 65s delay + 90s security + ~30s execution = ~250s buffer
   const timeoutPromise = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("TIMEOUT_EXCEEDED")), 120_000)
+    setTimeout(() => reject(new Error("TIMEOUT_EXCEEDED")), 300_000)
   );
 
   let results: [
@@ -195,7 +208,7 @@ export async function runOrchestrator(
             : { error: true, message: "Agente não concluído a tempo" },
         },
         filesAnalyzed: files.length,
-        errorMessage: "Tempo limite de 120 segundos excedido. Resultados parciais disponíveis.",
+        errorMessage: "Tempo limite de 5 minutos excedido. Resultados parciais disponíveis.",
       };
     }
     return {

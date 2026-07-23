@@ -59,11 +59,11 @@ router.post("/analyze", async (req, res) => {
   try {
     sendEvent("progress", { message: "Iniciando análise do repositório..." });
 
-    // 120-second global timeout
+    // 5-minute global timeout (agents need ~65s gaps between each)
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
         reject(new Error("TIMEOUT"));
-      }, 120000);
+      }, 300000);
     });
 
     sendEvent("progress", { message: "Buscando arquivos do repositório..." });
@@ -119,7 +119,7 @@ router.post("/analyze", async (req, res) => {
 
     if (err instanceof Error && err.message === "TIMEOUT") {
       sendEvent("error", {
-        message: "A análise excedeu o tempo limite de 120 segundos. Tente um repositório menor.",
+        message: "A análise excedeu o tempo limite de 5 minutos. Tente um repositório menor ou com menos arquivos.",
       });
     } else {
       console.error("[analyze] Erro inesperado:", err);

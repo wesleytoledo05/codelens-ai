@@ -106,10 +106,11 @@ export async function mimoChat(
 
       console.error(`[AI] Attempt ${attempt + 1}/${maxRetries + 1} failed: status=${status}, message=${errorMsg}`);
 
-      // Rate limited — exponential backoff starting at 15s
+      // Rate limited (429 = TPM exceeded on Groq free tier)
+      // Must wait at least 60s for the 1-minute TPM window to fully reset
       if (status === 429) {
-        const delay = Math.min(15000 * Math.pow(1.5, attempt), 60000);
-        console.warn(`[AI] Rate limited (429), waiting ${Math.round(delay)}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+        const delay = Math.min(65000 * Math.pow(1.5, attempt), 180000);
+        console.warn(`[AI] TPM rate limited (429), waiting ${Math.round(delay / 1000)}s for token window reset (attempt ${attempt + 1}/${maxRetries + 1})`);
         await sleep(delay);
         continue;
       }
@@ -130,8 +131,8 @@ export async function mimoChat(
 }
 
 // Limit total file content to fit within Groq free tier (6000 TPM per minute)
-// Each agent makes 1+ requests, so limit per-agent to ~2000 chars
-const MAX_TOTAL_CHARS = parseInt(process.env.MAX_INPUT_CHARS || "2000", 10);
+// Each agent makes 1+ requests, keep input under ~1000 chars to leave room for output tokens
+const MAX_TOTAL_CHARS = parseInt(process.env.MAX_INPUT_CHARS || "1000", 10);
 
 export type FileInput = {
   path: string;
