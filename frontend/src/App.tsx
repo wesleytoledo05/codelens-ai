@@ -75,7 +75,12 @@ function App() {
       />
 
       {stage === "idle" && (
-        <RepoInput onSubmit={handleAnalyze} isLoading={false} />
+        <RepoInput
+          onSubmit={handleAnalyze}
+          isLoading={false}
+          hasGroqKey={hasGroqKey}
+          onOpenSettings={() => setIsOpen(true)}
+        />
       )}
 
       {stage === "loading" && (

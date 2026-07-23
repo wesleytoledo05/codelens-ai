@@ -6,11 +6,15 @@ import {
   Bug,
   BarChart3,
   Download,
+  AlertTriangle,
+  Settings,
 } from "lucide-react";
 
 type RepoInputProps = {
   onSubmit: (url: string) => void;
   isLoading: boolean;
+  hasGroqKey: boolean;
+  onOpenSettings: () => void;
 };
 
 const EXAMPLES = [
@@ -21,7 +25,7 @@ const EXAMPLES = [
 
 const GITHUB_URL_PATTERN = /^https:\/\/github\.com\/[^/]+\/[^/]+$/;
 
-export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
+export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading, hasGroqKey, onOpenSettings }) => {
   const [url, setUrl] = useState("");
 
   const isValid = GITHUB_URL_PATTERN.test(url);
@@ -47,6 +51,28 @@ export const RepoInput: FC<RepoInputProps> = ({ onSubmit, isLoading }) => {
         </h1>
 
         <div className="space-y-4">
+          {/* Warning when no API key */}
+          {!hasGroqKey && (
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <AlertTriangle size={20} className="shrink-0 text-amber-600" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800">
+                  Chave Groq não configurada
+                </p>
+                <p className="text-xs text-amber-600">
+                  Configure sua chave de API gratuita para usar o sistema.
+                </p>
+              </div>
+              <button
+                onClick={onOpenSettings}
+                className="flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+              >
+                <Settings size={14} />
+                Configurar
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-col gap-4 sm:flex-row">
             <input
               type="text"

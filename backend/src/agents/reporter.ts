@@ -225,9 +225,5 @@ async function generateExecutiveSummary(
     lastError = error;
   }
 
-  if (lastError) {
-    console.warn("[Reporter] Failed to generate executive summary via AI, using fallback");
-  }
-
   return `O repositório analisado obteve score ${overallScore}/100 com ${input.filesAnalyzed} arquivos processados. A análise consolidou resultados de segurança, qualidade de código e bugs.`;
 }

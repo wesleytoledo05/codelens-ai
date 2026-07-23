@@ -19,25 +19,21 @@ const MODELS: Record<Provider, string> = {
 // Client cache keyed by API key to avoid creating new instances per request
 const clientCache = new Map<string, OpenAI>();
 
-function getClient(overrideApiKey?: string): OpenAI {
-  const cacheKey = `${PROVIDER}:${overrideApiKey || "env"}`;
+function getClient(apiKey: string): OpenAI {
+  const cacheKey = `${PROVIDER}:${apiKey}`;
   const cached = clientCache.get(cacheKey);
   if (cached) return cached;
 
-  let apiKey: string;
   let baseURL: string;
 
   switch (PROVIDER) {
     case "gemini":
-      apiKey = overrideApiKey || process.env.GEMINI_API_KEY || "";
       baseURL = "https://generativelanguage.googleapis.com/v1beta/openai/";
       break;
     case "groq":
-      apiKey = overrideApiKey || process.env.GROQ_API_KEY || "";
       baseURL = "https://api.groq.com/openai/v1";
       break;
     case "openrouter":
-      apiKey = overrideApiKey || process.env.OPENROUTER_API_KEY || "";
       baseURL = "https://openrouter.ai/api/v1";
       break;
   }
@@ -67,22 +63,14 @@ export async function mimoChat(
   const maxRetries = options?.retries ?? 3;
   let lastError: unknown;
 
-  const keyProvided = !!(options?.apiKey && options.apiKey.trim().length > 0);
-  const envKeySet = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 0);
-  const activeKey = options?.apiKey?.trim() || process.env.GROQ_API_KEY || "";
-  const keyPreview = activeKey.length > 8
-    ? `${activeKey.substring(0, 4)}...${activeKey.substring(activeKey.length - 4)}`
-    : "(empty)";
-
-  if (!keyProvided && !envKeySet) {
-    console.error(`[AI] CRITICAL: No API key provided AND no GROQ_API_KEY in env`);
+  const apiKey = options?.apiKey?.trim();
+  if (!apiKey) {
+    throw new Error("API key is required. Each user must provide their own Groq API key.");
   }
-
-  console.log(`[AI] Provider: ${PROVIDER}, Model: ${getModel()}, Key: ${keyPreview}, KeyProvided: ${keyProvided}, EnvKeySet: ${envKeySet}`);
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const client = getClient(options?.apiKey);
+      const client = getClient(apiKey);
       const model = getModel();
 
       const response = await client.chat.completions.create({
@@ -97,20 +85,14 @@ export async function mimoChat(
         throw new Error("AI returned empty response");
       }
 
-      console.log(`[AI] Success: ${content.length} chars, tokens: ${JSON.stringify(response.usage || {})}`);
       return content;
     } catch (error: any) {
       lastError = error;
       const status = error?.status || error?.response?.status;
-      const errorMsg = error?.message || "unknown error";
-
-      console.error(`[AI] Attempt ${attempt + 1}/${maxRetries + 1} failed: status=${status}, message=${errorMsg}`);
 
       // Rate limited (429 = TPM exceeded on Groq free tier)
-      // Must wait at least 60s for the 1-minute TPM window to fully reset
       if (status === 429) {
         const delay = Math.min(65000 * Math.pow(1.5, attempt), 180000);
-        console.warn(`[AI] TPM rate limited (429), waiting ${Math.round(delay / 1000)}s for token window reset (attempt ${attempt + 1}/${maxRetries + 1})`);
         await sleep(delay);
         continue;
       }
@@ -118,7 +100,6 @@ export async function mimoChat(
       // Server error — retry with backoff
       if (status === 500 || status === 502 || status === 503) {
         const delay = Math.min(5000 * Math.pow(2, attempt), 30000);
-        console.warn(`[AI] Server error (status ${status}), retrying in ${delay}ms`);
         await sleep(delay);
         continue;
       }

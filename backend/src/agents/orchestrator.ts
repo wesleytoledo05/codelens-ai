@@ -70,8 +70,6 @@ async function safeRun<T>(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : `Falha desconhecida no agente ${agentName}`;
-    const cause = err instanceof Error && err.cause instanceof Error ? err.cause.message : "";
-    console.error(`[Orchestrator] ${agentName} failed: ${message}${cause ? ` (cause: ${cause})` : ""}`);
     return { error: true, message };
   }
 }
@@ -139,20 +137,15 @@ export async function runOrchestrator(
   const agentsPromise = (async () => {
     const results: unknown[] = [];
 
-    console.log("[Orchestrator] Running CodeAnalyzer...");
     results.push(await safeRun(() => runCodeAnalyzer(agentInput as CodeAnalyzerInput), "CodeAnalyzer"));
 
-    console.log("[Orchestrator] Waiting 65s for TPM window to reset...");
     await delay(65000); // Wait 65s — well past the 1-minute TPM window
 
-    console.log("[Orchestrator] Running BugHunter...");
     results.push(await safeRun(() => runBugHunter(agentInput as BugHunterInput), "BugHunter"));
 
-    console.log("[Orchestrator] Waiting 65s for TPM window to reset...");
     await delay(65000); // Wait 65s for TPM reset
 
     // Security auditor gets its own 90s timeout so it always has time to run
-    console.log("[Orchestrator] Running SecurityAuditor...");
     const securityTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("SECURITY_TIMEOUT")), 90_000)
     );
@@ -165,7 +158,6 @@ export async function runOrchestrator(
     }));
     results.push(securityResult);
 
-    console.log("[Orchestrator] All 3 agents completed");
     return results as [
       CodeAnalyzerOutput | AgentError,
       BugHunterOutput | AgentError,

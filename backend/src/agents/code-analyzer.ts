@@ -28,13 +28,14 @@ export type CodeAnalyzerInput = {
   }>;
 } & ApiKeys;
 
-const SYSTEM_PROMPT = `You are a code quality analyzer. Analyze code and return ONLY valid JSON.
+const SYSTEM_PROMPT = `Você é um analisador de qualidade de código. Analise o código e retorne APENAS JSON válido.
 
-Return this structure:
-{"score": 0-100, "metrics": {"averageFunctionLength": number, "duplicatedBlocks": number, "filesWithoutTypes": number}, "issues": [{"file": "path", "line": 1, "type": "TYPE", "description": "...", "suggestion": "..."}]}
+Retorne esta estrutura:
+{"score": 0-100, "metrics": {"averageFunctionLength": number, "duplicatedBlocks": number, "filesWithoutTypes": number}, "issues": [{"file": "caminho", "line": 1, "type": "TIPO", "description": "descrição em português", "suggestion": "sugestão em português"}]}
 
-Analyze: cyclomatic complexity, duplication, function size, naming, type coverage.
-No markdown, no explanation — ONLY the JSON object.`;
+Analise: complexidade ciclomática, duplicação, tamanho de funções, nomenclatura, cobertura de tipos.
+IMPORTANTE: Todas as descrições e sugestões devem ser escritas em português brasileiro.
+Sem markdown, sem explicação — APENAS o objeto JSON.`;
 
 function extractJSON(response: string): unknown {
   // 1. Try code blocks
@@ -64,7 +65,7 @@ export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAna
     .map((f) => `=== ${f.path} ===\n${f.content}`)
     .join("\n\n");
 
-  const userMessage = `Analyze these files for quality issues:\n\n${fileContents}`;
+  const userMessage = `Analise estes arquivos em busca de problemas de qualidade:\n\n${fileContents}`;
 
   let lastError: unknown;
 
@@ -96,7 +97,7 @@ export async function runCodeAnalyzer(input: CodeAnalyzerInput): Promise<CodeAna
         { role: "assistant", content: "Let me provide the analysis." },
         {
           role: "user",
-          content: "Your previous response was not valid JSON. Return ONLY a valid JSON object matching the required structure. No markdown, no explanation.",
+          content: "Sua resposta anterior não era JSON válido. Retorne APENAS um objeto JSON válido seguindo a estrutura necessária. Sem markdown, sem explicação. Lembre-se: descrições e sugestões devem estar em português.",
         },
       ],
       { maxTokens: 2048, apiKey }
@@ -133,8 +134,8 @@ function coerceCodeAnalyzerOutput(raw: unknown): CodeAnalyzerOutput | null {
           file: typeof ii.file === "string" ? ii.file : `file-${idx}`,
           line: typeof ii.line === "number" ? ii.line : 0,
           type: typeof ii.type === "string" ? ii.type : "UNKNOWN",
-          description: typeof ii.description === "string" ? ii.description : "No description",
-          suggestion: typeof ii.suggestion === "string" ? ii.suggestion : "No suggestion",
+          description: typeof ii.description === "string" ? ii.description : "Sem descrição",
+          suggestion: typeof ii.suggestion === "string" ? ii.suggestion : "Sem sugestão",
         };
       }),
     };
