@@ -5,6 +5,7 @@ import type { ReporterOutput } from "../types";
 import { ScoreCard } from "./ScoreCard";
 import { SecurityPanel } from "./SecurityPanel";
 import { BugList } from "./BugList";
+import { QualityPanel } from "./QualityPanel";
 
 type DashboardProps = {
   report: ReporterOutput;
@@ -263,16 +264,14 @@ export const Dashboard: FC<DashboardProps> = ({ report, onNewAnalysis }) => {
           />
         </div>
 
-        {report.sections.security && (
-          <SecurityPanel
-            vulnerabilities={report.sections.security.vulnerabilities}
-            score={report.sections.security.score}
-          />
-        )}
+        <SecurityPanel
+          vulnerabilities={report.sections.security?.vulnerabilities ?? []}
+          score={report.sections.security?.score ?? 0}
+        />
 
-        {report.sections.bugs && (
-          <BugList bugs={report.sections.bugs.bugs} />
-        )}
+        <QualityPanel quality={report.sections.quality} />
+
+        <BugList bugs={report.sections.bugs?.bugs ?? []} />
       </div>
     </div>
   );

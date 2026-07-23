@@ -2,7 +2,7 @@ import type { ReporterOutput, SSEEvent } from "../types";
 import { USE_MOCK } from "../config";
 import { mockAnalysisResult } from "../mocks/analysisResult";
 
-const BASE_URL: string =
+export const BASE_URL: string =
   import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 type ApiKeys = {

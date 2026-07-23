@@ -26,10 +26,8 @@ router.post("/analyze", async (req, res) => {
   const { repoUrl, groqApiKey, githubToken } = parsed.data;
 
   const hasUserKey = !!(groqApiKey && groqApiKey.trim().length > 0);
-  const hasEnvKey = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY.trim().length > 0);
-  console.log(`[analyze] URL: ${repoUrl}, UserKey: ${hasUserKey}, EnvKey: ${hasEnvKey}, Token: ${!!githubToken}`);
 
-  if (!hasUserKey && !hasEnvKey) {
+  if (!hasUserKey) {
     res.status(400).json({
       error: "Chave de API Groq não configurada. Configure sua chave em Config API (canto superior direito). Obtenha uma gratuita em console.groq.com",
     });
@@ -103,9 +101,21 @@ router.post("/analyze", async (req, res) => {
       summary: "Análise de segurança não concluída. Score estimado com base nos dados disponíveis.",
     };
 
+    // Code analyzer fallback
+    const codeAnalyzerResult = toNull(ar.codeAnalyzer) ?? {
+      score: 50,
+      metrics: { averageFunctionLength: 0, duplicatedBlocks: 0, filesWithoutTypes: 0 },
+      issues: [],
+    };
+
+    // Bug hunter fallback
+    const bugHunterResult = toNull(ar.bugHunter) ?? {
+      bugs: [],
+    };
+
     const reporterResult = await runReporter({
-      codeAnalyzer: toNull(ar.codeAnalyzer),
-      bugHunter: toNull(ar.bugHunter),
+      codeAnalyzer: codeAnalyzerResult,
+      bugHunter: bugHunterResult,
       securityAuditor: securityResult,
       repoUrl,
       filesAnalyzed: orchestratorResult.filesAnalyzed,
@@ -122,7 +132,6 @@ router.post("/analyze", async (req, res) => {
         message: "A análise excedeu o tempo limite de 5 minutos. Tente um repositório menor ou com menos arquivos.",
       });
     } else {
-      console.error("[analyze] Erro inesperado:", err);
       sendEvent("error", {
         message: "Erro interno ao processar a análise. Tente novamente.",
       });
