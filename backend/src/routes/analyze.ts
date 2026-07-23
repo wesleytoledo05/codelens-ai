@@ -66,7 +66,12 @@ router.post("/analyze", async (req, res) => {
 
     sendEvent("progress", { message: "Buscando arquivos do repositório..." });
 
-    const orchestratorPromise = runOrchestrator({ repoUrl, groqApiKey, githubToken });
+    const orchestratorPromise = runOrchestrator({
+      repoUrl,
+      groqApiKey,
+      githubToken,
+      onProgress: (msg) => sendEvent("progress", { message: msg }),
+    });
 
     const orchestratorResult = await Promise.race([
       orchestratorPromise,

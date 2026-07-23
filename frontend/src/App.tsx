@@ -84,10 +84,7 @@ function App() {
       )}
 
       {stage === "loading" && (
-        <LoadingState
-          currentStage={currentMessage}
-          currentAgent="Groq AI"
-        />
+        <LoadingState currentStage={currentMessage} />
       )}
 
       {stage === "success" && report && (
