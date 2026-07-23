@@ -14,6 +14,7 @@ import type { ApiKeys } from "../types";
 
 export type OrchestratorInput = {
   repoUrl: string;
+  onProgress?: (message: string) => void;
 } & ApiKeys;
 
 type CodeAnalyzerOutput = {
@@ -83,7 +84,8 @@ const errorResult = (msg: string) => ({
 export async function runOrchestrator(
   input: OrchestratorInput
 ): Promise<OrchestratorOutput> {
-  const { groqApiKey, githubToken } = input;
+  const { groqApiKey, githubToken, onProgress } = input;
+  const notify = (msg: string) => onProgress?.(msg);
 
   if (!GITHUB_URL_REGEX.test(input.repoUrl)) {
     return {
@@ -96,11 +98,13 @@ export async function runOrchestrator(
 
   let files: Awaited<ReturnType<typeof fetchRepositoryFiles>>;
   try {
+    notify("Conectando ao repositório GitHub...");
     const fetchPromise = fetchRepositoryFiles(input.repoUrl, githubToken || process.env.GITHUB_TOKEN);
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("TIMEOUT_EXCEEDED")), 120_000)
     );
     files = await Promise.race([fetchPromise, timeoutPromise]);
+    notify(`${files.length} arquivos relevantes encontrados no repositório`);
   } catch (err) {
     if (err instanceof Error && err.message === "TIMEOUT_EXCEEDED") {
       return {
@@ -137,15 +141,20 @@ export async function runOrchestrator(
   const agentsPromise = (async () => {
     const results: unknown[] = [];
 
+    notify("Analisando qualidade do código...");
     results.push(await safeRun(() => runCodeAnalyzer(agentInput as CodeAnalyzerInput), "CodeAnalyzer"));
 
+    notify("Aguardando reset do limite de tokens (65s)...");
     await delay(65000); // Wait 65s — well past the 1-minute TPM window
 
+    notify("Detectando bugs e antipatterns...");
     results.push(await safeRun(() => runBugHunter(agentInput as BugHunterInput), "BugHunter"));
 
+    notify("Aguardando reset do limite de tokens (65s)...");
     await delay(65000); // Wait 65s for TPM reset
 
     // Security auditor gets its own 90s timeout so it always has time to run
+    notify("Verificando vulnerabilidades de segurança...");
     const securityTimeout = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("SECURITY_TIMEOUT")), 90_000)
     );
